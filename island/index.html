@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+<style>
+  :root { --ease: cubic-bezier(.32,.72,0,1); --green:#5DCAA5; --amber:#EF9F27; --red:#E24B4A; --fable:#7F77DD; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; background:transparent; overflow:hidden; font-family:"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif; -webkit-font-smoothing:antialiased; user-select:none; }
+  .stage { display:flex; justify-content:center; padding-top:2px; }
+  .isl { position:relative; overflow:hidden; background:#0b0b0b; color:#fff; cursor:pointer;
+    width:250px; height:36px; border-radius:18px;
+    box-shadow:0 0 0 1px rgba(255,255,255,.06);
+    transition:width .55s var(--ease), height .55s var(--ease), border-radius .55s var(--ease), transform .25s var(--ease), box-shadow .3s; }
+  .isl:hover:not(.open) { transform:scale(1.04); }
+  .isl.alert { box-shadow:0 0 0 2px var(--sev); }
+  .mini { position:absolute; inset:0; display:flex; align-items:center; justify-content:space-between; padding:0 14px; font-size:13px; gap:10px; white-space:nowrap; transition:opacity .2s, filter .2s; }
+  .isl.open .mini { opacity:0; filter:blur(4px); pointer-events:none; }
+  .mini .l { display:flex; align-items:center; gap:8px; }
+  .mini .mid { color:#a9a9a9; }
+  .dot { width:8px; height:8px; border-radius:50%; background:var(--sev, var(--green)); flex:none; }
+  .dot.live { animation:pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.35 } }
+  .pop { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; gap:8px; font-size:13px; opacity:0; transform:scale(.9); transition:opacity .25s, transform .35s var(--ease); pointer-events:none; }
+  .isl.popping .pop { opacity:1; transform:scale(1); }
+  .isl.popping .mini { opacity:0; }
+  .det { position:absolute; top:0; left:50%; width:380px; padding:16px 0 14px; opacity:0; filter:blur(6px);
+    transform:translateX(-50%) scale(.92); transition:opacity .25s, filter .25s, transform .45s var(--ease); }
+  .isl.open .det { opacity:1; filter:blur(0); transform:translateX(-50%) scale(1); transition-delay:.12s; }
+  .row { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .lbl { font-size:12px; color:#a9a9a9; }
+  .val { font-size:12px; color:#e8e8e8; }
+  .bar { height:6px; border-radius:3px; background:#262626; overflow:hidden; margin:6px 0 4px; }
+  .bar > i { display:block; height:100%; border-radius:3px; width:0; transition:width .8s var(--ease) .2s; }
+  .sec { margin-top:11px; }
+  .hr { margin-top:11px; padding-top:10px; border-top:1px solid #222; }
+  .hist { display:flex; align-items:flex-end; gap:6px; height:30px; margin-top:6px; }
+  .hist div { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; }
+  .hist b { display:block; width:100%; border-radius:2px; background:#3a3a3a; min-height:2px; }
+  .hist b.today { background:var(--green); }
+  .hist span { font-size:10px; color:#777; }
+  .stale { color:var(--amber); }
+  .hidden { display:none !important; }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="isl" id="isl">
+    <div class="mini" id="mini">
+      <span class="l"><span class="dot" id="dot"></span><span id="m5">Waiting for Claude Code</span></span>
+      <span class="mid" id="mReset"></span>
+      <span id="mWk"></span>
+    </div>
+    <div class="pop" id="pop"><span class="dot" style="--sev:var(--green)"></span><span id="popText">Limit refreshed</span></div>
+    <div class="det" id="det">
+      <div class="row"><span class="val" id="dModel">Claude</span><span class="lbl" id="dSessionAge"></span></div>
+
+      <div class="sec">
+        <div class="lbl">Current session (5-hour window)</div>
+        <div class="bar"><i id="b5"></i></div>
+        <div class="row lbl"><span id="d5">-</span><span id="d5r">-</span></div>
+      </div>
+
+      <div class="sec" id="weekSec">
+        <div class="lbl">This week · all models</div>
+        <div class="bar"><i id="bWk" style="background:var(--green)"></i></div>
+        <div class="row lbl"><span id="dWk">-</span><span id="dWkr">-</span></div>
+        <div class="lbl" id="dPace" style="margin-top:4px"></div>
+      </div>
+
+      <div class="sec hidden" id="fableSec">
+        <div class="lbl">This week · Fable</div>
+        <div class="bar"><i id="bFa" style="background:var(--fable)"></i></div>
+        <div class="row lbl"><span id="dFa">-</span><span id="dFar">-</span></div>
+      </div>
+
+      <div class="hr">
+        <div class="row"><span class="lbl">Burn rate</span><span class="val" id="dRate">-</span></div>
+        <div class="row" style="margin-top:4px"><span class="lbl">Forecast</span><span class="val" id="dForecast">-</span></div>
+      </div>
+
+      <div class="hr">
+        <div class="lbl">Last 7 days</div>
+        <div class="hist" id="hist"></div>
+      </div>
+
+      <div class="row hr lbl"><span id="dCtx"></span><span id="dUpdated"></span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const isl = $('isl'), det = $('det');
+const FIVE_H = 5 * 3600e3, WEEK = 7 * 24 * 3600e3, STALE = 10 * 60e3;
+let data = null, open = false, lastSev = 0, lastFiveReset = null, lastFivePct = null, collapseTimer = null, popTimer = null;
+
+const sevOf = (p) => p == null ? 0 : p >= 95 ? 3 : p >= 80 ? 2 : p >= 50 ? 1 : 0;
+const sevColor = (s) => s >= 3 ? 'var(--red)' : s >= 2 ? 'var(--amber)' : 'var(--green)';
+const barColor = (p) => p >= 95 ? 'var(--red)' : p >= 80 ? 'var(--amber)' : 'var(--green)';
+const pct = (p) => p == null ? '-' : Math.round(p) + '%';
+const clock = (ms) => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+const dayClock = (ms) => new Date(ms).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+function dur(ms) {
+  if (ms <= 0) return 'now';
+  const m = Math.round(ms / 60e3), d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60), mm = m % 60;
+  if (d) return `${d}d ${h}h`;
+  if (h) return `${h}h ${mm}m`;
+  return `${mm}m`;
+}
+
+function burnRate() {
+  if (!data || !data.five || !Array.isArray(data.samples)) return null;
+  const now = Date.now();
+  const s = data.samples.filter(x => x.fiveReset === data.five.resetsAt && x.t > now - 60 * 60e3);
+  if (s.length < 2) return null;
+  const a = s[0], b = s[s.length - 1], hrs = (b.t - a.t) / 3600e3;
+  if (hrs < 5 / 60) return null;
+  return Math.max(0, (b.five - a.five) / hrs);
+}
+
+function history() {
+  const out = [];
+  const samples = (data && data.samples) || [];
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  for (let i = 6; i >= 0; i--) {
+    const d0 = start.getTime() - i * 864e5, d1 = d0 + 864e5;
+    let sum = 0, prev = null;
+    for (const x of samples) {
+      if (x.week == null) continue;
+      if (prev != null && x.t >= d0 && x.t < d1 && x.week > prev) sum += x.week - prev;
+      prev = x.week;
+    }
+    out.push({ label: new Date(d0).toLocaleDateString([], { weekday: 'narrow' }), v: sum, today: i === 0 });
+  }
+  return out;
+}
+
+function popMsg(text) {
+  $('popText').textContent = text;
+  isl.classList.add('popping');
+  clearTimeout(popTimer);
+  popTimer = setTimeout(() => isl.classList.remove('popping'), 3500);
+}
+
+function render() {
+  const now = Date.now();
+  if (!data || (!data.five && !data.week)) {
+    $('m5').textContent = 'Waiting for Claude Code';
+    $('mReset').textContent = ''; $('mWk').textContent = '';
+    isl.style.setProperty('--sev', '#666');
+    return;
+  }
+  const five = data.five, week = data.week, fable = data.fable;
+  const stale = now - data.updatedAt > STALE;
+  const fiveExpired = five && five.resetsAt && now > five.resetsAt;
+  const fivePct = fiveExpired ? 0 : five ? five.pct : null;
+
+  const sev = Math.max(sevOf(fivePct), sevOf(week && week.pct));
+  isl.style.setProperty('--sev', sevColor(sev));
+  $('dot').classList.toggle('live', now - data.updatedAt < 20e3);
+
+  if (sev > lastSev && sev >= 2) {
+    isl.classList.add('alert');
+    setTimeout(() => isl.classList.remove('alert'), 2500);
+    popMsg(sev >= 3 ? `Session at ${pct(fivePct)}, almost out` : `Heads up, session at ${pct(fivePct)}`);
+  }
+  lastSev = sev;
+
+  if (five && lastFiveReset && five.resetsAt && five.resetsAt > lastFiveReset + 60e3 && lastFivePct > 5) popMsg('Limit refreshed');
+  if (five) { lastFiveReset = five.resetsAt; lastFivePct = five.pct; }
+
+  $('m5').textContent = '5h ' + pct(fivePct);
+  $('mReset').textContent = fiveExpired ? 'reset' : five && five.resetsAt ? clock(five.resetsAt) : '';
+  $('mReset').className = 'mid' + (stale ? ' stale' : '');
+  $('mWk').textContent = week ? 'wk ' + pct(week.pct) : '';
+
+  $('dModel').textContent = [data.model, data.project].filter(Boolean).join(' · ') || 'Claude';
+  if (five && five.resetsAt && !fiveExpired) {
+    $('dSessionAge').textContent = 'Session running ' + dur(now - (five.resetsAt - FIVE_H));
+    $('d5').textContent = pct(fivePct) + ' used';
+    $('d5r').textContent = `Resets in ${dur(five.resetsAt - now)} · ${clock(five.resetsAt)}`;
+  } else {
+    $('dSessionAge').textContent = '';
+    $('d5').textContent = fiveExpired ? 'Window reset' : pct(fivePct) + ' used';
+    $('d5r').textContent = fiveExpired ? 'Starts with your next message' : '';
+  }
+
+  if (week) {
+    $('dWk').textContent = pct(week.pct) + ' used';
+    $('dWkr').textContent = week.resetsAt ? 'Resets ' + dayClock(week.resetsAt) : '';
+    if (week.resetsAt) {
+      const elapsed = Math.min(1, Math.max(0, 1 - (week.resetsAt - now) / WEEK));
+      const day = Math.min(7, Math.floor(elapsed * 7) + 1);
+      const target = elapsed * 100, diff = week.pct - target;
+      $('dPace').textContent = `Day ${day} of 7 · ` + (diff > 8 ? `ahead of pace by ${Math.round(diff)}%, slow down` : diff < -8 ? 'well under pace' : 'on track');
+      $('dPace').style.color = diff > 8 ? 'var(--amber)' : '#a9a9a9';
+    }
+  }
+  $('weekSec').classList.toggle('hidden', !week);
+  $('fableSec').classList.toggle('hidden', !fable);
+  if (fable) {
+    $('dFa').textContent = pct(fable.pct) + ' used';
+    $('dFar').textContent = fable.resetsAt ? 'Resets ' + dayClock(fable.resetsAt) : '';
+  }
+
+  const rate = fiveExpired ? null : burnRate();
+  $('dRate').textContent = rate == null ? 'Not enough data yet' : rate < 0.5 ? 'Idle' : `~${Math.round(rate)}% per hour`;
+  let fc = 'Comfortable until reset';
+  if (rate && rate >= 0.5 && five && five.resetsAt && !fiveExpired) {
+    const hitAt = now + ((100 - fivePct) / rate) * 3600e3;
+    if (hitAt < five.resetsAt) fc = `You'll hit the limit around ${clock(hitAt)}`;
+  }
+  if (fiveExpired) fc = 'Fresh window ready';
+  $('dForecast').textContent = fc;
+  $('dForecast').style.color = fc.startsWith('You') ? 'var(--amber)' : '#e8e8e8';
+
+  const h = history(), max = Math.max(5, ...h.map(x => x.v));
+  $('hist').innerHTML = h.map(x => `<div><b class="${x.today ? 'today' : ''}" style="height:${Math.max(2, Math.round((x.v / max) * 24))}px"></b><span>${x.label}</span></div>`).join('');
+
+  const extras = [];
+  if (data.ctx != null) extras.push('ctx ' + data.ctx + '%');
+  if (data.cost != null) extras.push('$' + Number(data.cost).toFixed(2));
+  $('dCtx').textContent = extras.join(' · ');
+  $('dUpdated').textContent = now - data.updatedAt < 60e3 ? 'Updated just now' : 'Updated ' + dur(now - data.updatedAt) + ' ago';
+  $('dUpdated').className = stale ? 'stale' : '';
+
+  if (open) setBars();
+}
+
+function setBars() {
+  if (!data) return;
+  const now = Date.now();
+  const fivePct = data.five && data.five.resetsAt && now > data.five.resetsAt ? 0 : data.five ? data.five.pct : 0;
+  $('b5').style.width = Math.min(100, fivePct) + '%';
+  $('b5').style.background = barColor(fivePct);
+  $('bWk').style.width = Math.min(100, data.week ? data.week.pct : 0) + '%';
+  $('bWk').style.background = barColor(data.week ? data.week.pct : 0);
+  $('bFa').style.width = Math.min(100, data.fable ? data.fable.pct : 0) + '%';
+}
+
+function setOpen(o) {
+  open = o;
+  isl.classList.toggle('open', o);
+  if (o) {
+    isl.style.width = '420px';
+    isl.style.height = det.offsetHeight + 'px';
+    isl.style.borderRadius = '32px';
+    setBars();
+  } else {
+    isl.style.width = ''; isl.style.height = ''; isl.style.borderRadius = '';
+    ['b5', 'bWk', 'bFa'].forEach(id => $(id).style.width = '0');
+  }
+}
+
+isl.addEventListener('click', () => setOpen(!open));
+isl.addEventListener('mouseenter', () => { clearTimeout(collapseTimer); window.island && window.island.setMouseOver(true); });
+isl.addEventListener('mouseleave', () => {
+  window.island && window.island.setMouseOver(false);
+  clearTimeout(collapseTimer);
+  collapseTimer = setTimeout(() => open && setOpen(false), 6000);
+});
+
+if (window.island) window.island.onUsage((d) => { data = d; render(); if (open) isl.style.height = det.offsetHeight + 'px'; });
+setInterval(render, 1000);
+render();
+</script>
+</body>
+</html>
