@@ -10,7 +10,10 @@ const H = 620;
 let win = null;
 let tray = null;
 
-if (!app.requestSingleInstanceLock()) app.quit();
+if (!app.requestSingleInstanceLock()) { app.quit(); process.exit(0); }
+// Launching again (start-island.bat) restarts the running copy, so new code always loads
+app.on('second-instance', () => { app.relaunch(); app.exit(0); });
+const VERSION = require('./package.json').version;
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
 const PREFS = () => path.join(app.getPath('userData'), 'prefs.json');
@@ -75,11 +78,14 @@ function toggleVisible() {
 
 function createTray() {
   tray = new Tray(nativeImage.createFromPath(path.join(__dirname, 'icon.png')));
-  tray.setToolTip('Claude Island');
+  tray.setToolTip('Claude Island v' + VERSION);
   const loginOpts = { path: process.execPath, args: [app.getAppPath()] };
   const startup = app.getLoginItemSettings(loginOpts).openAtLogin;
   tray.setContextMenu(Menu.buildFromTemplate([
+    { label: 'Claude Island v' + VERSION, enabled: false },
+    { type: 'separator' },
     { label: 'Show / hide   (Ctrl+Alt+U)', click: toggleVisible },
+    { label: 'Restart', click: () => { app.relaunch(); app.exit(0); } },
     {
       label: 'Start with Windows', type: 'checkbox', checked: startup,
       click: (item) => app.setLoginItemSettings({ ...loginOpts, openAtLogin: item.checked }),
