@@ -70,12 +70,13 @@ function toggleVisible() {
 function createTray() {
   tray = new Tray(nativeImage.createFromPath(path.join(__dirname, 'icon.png')));
   tray.setToolTip('Claude Island');
-  const startup = app.getLoginItemSettings().openAtLogin;
+  const loginOpts = { path: process.execPath, args: [app.getAppPath()] };
+  const startup = app.getLoginItemSettings(loginOpts).openAtLogin;
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: 'Show / hide   (Ctrl+Alt+U)', click: toggleVisible },
     {
       label: 'Start with Windows', type: 'checkbox', checked: startup,
-      click: (item) => app.setLoginItemSettings({ openAtLogin: item.checked }),
+      click: (item) => app.setLoginItemSettings({ ...loginOpts, openAtLogin: item.checked }),
     },
     { type: 'separator' },
     { label: 'Quit', click: () => app.quit() },
