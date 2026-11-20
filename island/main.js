@@ -4,6 +4,7 @@ const os = require('os');
 const path = require('path');
 
 const FILE = path.join(os.homedir(), '.claude', 'usage-island.json');
+const STATE_FILE = path.join(os.homedir(), '.claude', 'island-state.json');
 const W = 460;
 const H = 500;
 let win = null;
@@ -39,7 +40,7 @@ function createWindow() {
   win.setVisibleOnAllWorkspaces(true);
   win.setIgnoreMouseEvents(true, { forward: true });
   win.loadFile(path.join(__dirname, 'index.html'));
-  win.webContents.on('did-finish-load', sendUsage);
+  win.webContents.on('did-finish-load', () => { sendUsage(); sendActivity(); });
 }
 
 function sendUsage() {
@@ -49,6 +50,15 @@ function sendUsage() {
     win.webContents.send('usage', data);
   } catch (_) {
     win.webContents.send('usage', null);
+  }
+}
+
+function sendActivity() {
+  if (!win) return;
+  try {
+    win.webContents.send('activity', JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')));
+  } catch (_) {
+    win.webContents.send('activity', null);
   }
 }
 
@@ -82,7 +92,8 @@ app.whenReady().then(() => {
   createTray();
   globalShortcut.register('CommandOrControl+Alt+U', toggleVisible);
   fs.watchFile(FILE, { interval: 1500 }, sendUsage);
-  setInterval(sendUsage, 30000);
+  fs.watchFile(STATE_FILE, { interval: 700 }, sendActivity);
+  setInterval(() => { sendUsage(); sendActivity(); }, 30000);
   screen.on('display-metrics-changed', place);
 });
 

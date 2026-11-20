@@ -19,7 +19,9 @@
   .mini .l { display:flex; align-items:center; gap:8px; }
   .mini .mid { color:#a9a9a9; }
   .dot { width:8px; height:8px; border-radius:50%; background:var(--sev, var(--green)); flex:none; }
-  .dot.live { animation:pulse 1.6s ease-in-out infinite; }
+  .act { width:9px; height:9px; border-radius:50%; background:#5a5a5a; flex:none; transition:background .3s; }
+  .act.working { background:var(--green); box-shadow:0 0 6px var(--green); animation:pulse 1.4s ease-in-out infinite; }
+  .act.needs { background:var(--red); box-shadow:0 0 6px var(--red); animation:pulse .9s ease-in-out infinite; }
   @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.35 } }
   .pop { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; gap:8px; font-size:13px; opacity:0; transform:scale(.9); transition:opacity .25s, transform .35s var(--ease); pointer-events:none; }
   .isl.popping .pop { opacity:1; transform:scale(1); }
@@ -47,13 +49,13 @@
 <div class="stage">
   <div class="isl" id="isl">
     <div class="mini" id="mini">
-      <span class="l"><span class="dot" id="dot"></span><span id="m5">Waiting for Claude Code</span></span>
+      <span class="l"><span class="act" id="act"></span><span id="m5">Waiting for Claude Code</span></span>
       <span class="mid" id="mReset"></span>
       <span id="mWk"></span>
     </div>
-    <div class="pop" id="pop"><span class="dot" style="--sev:var(--green)"></span><span id="popText">Limit refreshed</span></div>
+    <div class="pop" id="pop"><span class="dot" id="popDot"></span><span id="popText">Limit refreshed</span></div>
     <div class="det" id="det">
-      <div class="row"><span class="val" id="dModel">Claude</span><span class="lbl" id="dSessionAge"></span></div>
+      <div class="row"><span class="val" style="display:flex;align-items:center;gap:8px"><span class="act" id="act2"></span><span id="dAct" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px">Idle</span></span><span class="lbl" id="dSessionAge" style="white-space:nowrap"></span></div>
 
       <div class="sec">
         <div class="lbl">Current session (5-hour window)</div>
@@ -93,7 +95,7 @@
 const $ = (id) => document.getElementById(id);
 const isl = $('isl'), det = $('det');
 const FIVE_H = 5 * 3600e3, WEEK = 7 * 24 * 3600e3, STALE = 10 * 60e3;
-let data = null, open = false, lastSev = 0, lastFiveReset = null, lastFivePct = null, collapseTimer = null, popTimer = null;
+let data = null, activity = null, lastAct = 'idle-init', open = false, lastSev = 0, lastFiveReset = null, lastFivePct = null, collapseTimer = null, popTimer = null;
 
 const sevOf = (p) => p == null ? 0 : p >= 95 ? 3 : p >= 80 ? 2 : p >= 50 ? 1 : 0;
 const sevColor = (s) => s >= 3 ? 'var(--red)' : s >= 2 ? 'var(--amber)' : 'var(--green)';
@@ -136,8 +138,9 @@ function history() {
   return out;
 }
 
-function popMsg(text) {
+function popMsg(text, color) {
   $('popText').textContent = text;
+  $('popDot').style.background = color || 'var(--green)';
   isl.classList.add('popping');
   clearTimeout(popTimer);
   popTimer = setTimeout(() => isl.classList.remove('popping'), 3500);
@@ -158,12 +161,11 @@ function render() {
 
   const sev = Math.max(sevOf(fivePct), sevOf(week && week.pct));
   isl.style.setProperty('--sev', sevColor(sev));
-  $('dot').classList.toggle('live', now - data.updatedAt < 20e3);
 
   if (sev > lastSev && sev >= 2) {
     isl.classList.add('alert');
     setTimeout(() => isl.classList.remove('alert'), 2500);
-    popMsg(sev >= 3 ? `Session at ${pct(fivePct)}, almost out` : `Heads up, session at ${pct(fivePct)}`);
+    popMsg(sev >= 3 ? `Session at ${pct(fivePct)}, almost out` : `Heads up, session at ${pct(fivePct)}`, sev >= 3 ? 'var(--red)' : 'var(--amber)');
   }
   lastSev = sev;
 
@@ -171,13 +173,13 @@ function render() {
   if (five) { lastFiveReset = five.resetsAt; lastFivePct = five.pct; }
 
   $('m5').textContent = '5h ' + pct(fivePct);
+  $('m5').style.color = fivePct >= 95 ? 'var(--red)' : fivePct >= 80 ? 'var(--amber)' : '#fff';
   $('mReset').textContent = fiveExpired ? 'reset' : five && five.resetsAt ? clock(five.resetsAt) : '';
   $('mReset').className = 'mid' + (stale ? ' stale' : '');
   $('mWk').textContent = week ? 'wk ' + pct(week.pct) : '';
 
-  $('dModel').textContent = [data.model, data.project].filter(Boolean).join(' · ') || 'Claude';
   if (five && five.resetsAt && !fiveExpired) {
-    $('dSessionAge').textContent = 'Session running ' + dur(now - (five.resetsAt - FIVE_H));
+    $('dSessionAge').textContent = 'Running ' + dur(now - (five.resetsAt - FIVE_H));
     $('d5').textContent = pct(fivePct) + ' used';
     $('d5r').textContent = `Resets in ${dur(five.resetsAt - now)} · ${clock(five.resetsAt)}`;
   } else {
@@ -219,6 +221,7 @@ function render() {
   $('hist').innerHTML = h.map(x => `<div><b class="${x.today ? 'today' : ''}" style="height:${Math.max(2, Math.round((x.v / max) * 24))}px"></b><span>${x.label}</span></div>`).join('');
 
   const extras = [];
+  if (data.model) extras.push(data.model);
   if (data.ctx != null) extras.push('ctx ' + data.ctx + '%');
   if (data.cost != null) extras.push('$' + Number(data.cost).toFixed(2));
   $('dCtx').textContent = extras.join(' · ');
@@ -226,6 +229,23 @@ function render() {
   $('dUpdated').className = stale ? 'stale' : '';
 
   if (open) setBars();
+}
+
+function renderActivity() {
+  const now = Date.now();
+  const sessions = activity && activity.sessions ? Object.values(activity.sessions) : [];
+  const needs = sessions.filter(x => x.state === 'needs-you');
+  const done = sessions.filter(x => x.state === 'done' && now - x.t < 30 * 60e3);
+  const working = sessions.filter(x => x.state === 'working' && now - x.t < 20 * 60e3);
+  let st = 'idle', label = 'Idle', proj = null;
+  if (needs.length) { st = 'needs'; proj = needs[0].project; label = /permission/i.test(needs[0].message || '') ? 'Needs your permission' : 'Waiting for you'; }
+  else if (working.length) { st = 'working'; proj = working[0].project; label = working.length > 1 ? `Working in ${working.length} sessions` : 'Working on its own'; }
+  else if (done.length) { st = 'needs'; proj = done[0].project; label = 'Done · your turn'; }
+  for (const id of ['act', 'act2']) { $(id).classList.toggle('working', st === 'working'); $(id).classList.toggle('needs', st === 'needs'); }
+  $('dAct').textContent = label + (proj && !label.startsWith('Working in') ? ' · ' + proj : '');
+  const key = st + label;
+  if (st === 'needs' && lastAct !== key && lastAct !== 'idle-init') popMsg(label === 'Done · your turn' ? 'Claude is done · your turn' : 'Claude needs you', 'var(--red)');
+  lastAct = activity ? key : 'idle-init';
 }
 
 function setBars() {
@@ -261,8 +281,9 @@ isl.addEventListener('mouseleave', () => {
   collapseTimer = setTimeout(() => open && setOpen(false), 6000);
 });
 
+if (window.island && window.island.onActivity) window.island.onActivity((d) => { activity = d; renderActivity(); });
 if (window.island) window.island.onUsage((d) => { data = d; render(); if (open) isl.style.height = det.offsetHeight + 'px'; });
-setInterval(render, 1000);
+setInterval(() => { render(); renderActivity(); }, 1000);
 render();
 </script>
 </body>

@@ -14,45 +14,58 @@ I use Claude Code a lot and kept hitting the 5-hour limit without warning. Claud
 
 ## Features
 
-- **Collapsed pill:** session %, reset time and weekly %, color-coded green, amber and red
+- **Activity light:** 🟢 pulsing green while Claude works on its own, 🔴 pulsing red when Claude needs you (permission, or done and waiting), ⚪ gray when idle
+- **Collapsed pill:** session %, reset time and weekly %. The session % turns amber at 80% and red at 95%
 - **Click to expand:** session, weekly and Fable bars with reset times
 - **Burn rate** and a "you'll hit the limit around X" forecast
 - **Weekly pacing:** "Day 4 of 7, on track" or "ahead of pace"
 - **7-day history** mini chart
-- **Alerts:** the pill flashes amber at 80%, turns red at 95%, and shows "Limit refreshed" when your window resets
+- **Alerts:** "Claude needs you" and "Claude is done, your turn" pop-ups, an amber flash at 80%, red at 95%, and "Limit refreshed" when your window resets
 - **Ctrl + Alt + U** to show or hide it, a tray icon, and an optional start-with-Windows setting
 
 ## How it works
 
 ```
-Claude Code ──(status line JSON)──▶ island-statusline.js ──▶ ~/.claude/usage-island.json ──▶ Island app
+Claude Code ──(status line JSON)──▶ island-statusline.js ──▶ ~/.claude/usage-island.json ──┐
+Claude Code ──(hooks)─────────────▶ island-hook.js ───────▶ ~/.claude/island-state.json ──┴─▶ Island app
 ```
 
-Claude Code passes the official `rate_limits` (5-hour and 7-day) to your status line on Pro and Max plans. The script saves those numbers locally and prints your normal status line. The Electron app watches that file. Nothing leaves your machine, and it doesn't scrape claude.ai or use private endpoints.
+- **Usage numbers:** Claude Code passes the official `rate_limits` (5-hour and 7-day) to your status line on Pro and Max plans. The script saves them locally and prints your normal status line.
+- **Activity light:** Claude Code [hooks](https://code.claude.com/docs/en/hooks) run a tiny script when you send a prompt or a tool finishes (working), when Claude needs input or permission (needs you), when it finishes (done), and when the session ends.
+- **The island** watches those two files and shows them.
+
+## Safety
+
+- **No network:** nothing in this project makes a network request, and nothing leaves your machine.
+- **No commands:** the app and scripts never launch programs.
+- **Writes only:** `~/.claude/usage-island.json`, `~/.claude/island-state.json`, and copies of the scripts in `~/.claude/claude-island/`.
+- **Never blocks Claude:** the hook prints nothing, always exits 0, and stops itself after 2 seconds. It takes about 0.05–0.1 s per run.
+- **Locked-down window:** context isolation is on, Node is off in the page, and a strict CSP means it only loads its own files.
+- **Reversible:** `setup.js` backs up your `settings.json` and only adds its own entries. Your other settings and hooks are untouched. `uninstall.js` removes exactly what was added and restores your previous status line.
 
 ## Setup (Windows)
 
 Requires [Node.js](https://nodejs.org) LTS.
 
-**Easiest:** download this repo, open the Code tab in the Claude desktop app, and ask Claude to set it up by following this README.
-
-**Manual:**
-
-1. Copy `statusline/island-statusline.js` to `C:\Users\<you>\.claude\island-statusline.js`
-2. In `C:\Users\<you>\.claude\settings.json`, set:
-   ```json
-   "statusLine": {
-     "type": "command",
-     "command": "node C:/Users/<you>/.claude/island-statusline.js"
-   }
+1. Download this repo (Code → Download ZIP) and unzip it somewhere permanent, like `C:\Users\<you>\claude-island`
+2. Open a terminal in that folder and run:
    ```
-3. Run:
-   ```
+   node setup.js
    cd island
    npm install
    ```
-4. Double-click `start-island.bat`
-5. Send a message in Claude Code and the pill fills in.
+3. Double-click `start-island.bat`
+4. Restart Claude Code and send a message
+
+**Shortcut:** open the Code tab in the Claude desktop app and ask Claude to set this up by following this README.
+
+### Using it
+- **Click** the pill to expand. It collapses on its own 6 seconds after your mouse leaves
+- **Ctrl + Alt + U** shows or hides it
+- **Tray icon:** show or hide, Start with Windows, quit
+
+### Uninstall
+Quit the island from the tray icon, then run `node uninstall.js` in the folder and delete the folder.
 
 ## Limitations
 
@@ -60,6 +73,7 @@ Requires [Node.js](https://nodejs.org) LTS.
 - Live limits need a Pro or Max plan, and appear after the first response in a session.
 - Built and tested on a virtual display. Windows testing is in progress, so please open an issue if something breaks.
 - It's an Electron app, so it uses about 100 MB of RAM. A lighter Tauri version may come later.
+- With several Claude Code sessions open, red wins: if any session needs you, the light is red.
 
 ## License
 
