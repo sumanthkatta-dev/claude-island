@@ -38,7 +38,7 @@ process.stdin.on('end', () => {
       const file = ti.file_path || ti.notebook_path ? path.basename(String(ti.file_path || ti.notebook_path)) : null;
       if (/^(Edit|MultiEdit|Write|NotebookEdit)$/.test(t)) last = '✏️ Edited ' + (file || 'a file');
       else if (t === 'Read') last = '📖 Read ' + (file || 'a file');
-      else if (t === 'Bash') last = ti.description ? '▶️ ' + String(ti.description) : '▶️ Ran ' + String(ti.command || 'a command');
+      else if (t === 'Bash' || t === 'PowerShell') last = ti.description ? '▶️ ' + String(ti.description) : '▶️ Ran ' + (t === 'PowerShell' ? 'a PowerShell command' : String(ti.command || 'a command'));
       else if (/^(Grep|Glob)$/.test(t)) last = '🔍 Searched the code';
       else if (/^Web/.test(t)) last = '🌐 Looked something up';
       else if (/^(Task|Agent)$/.test(t)) last = '🤖 Ran a subagent';
@@ -52,10 +52,12 @@ process.stdin.on('end', () => {
       sessions[id] = {
         state,
         t: now,
-        project: input.cwd ? path.basename(String(input.cwd)).slice(0, 80) : null,
+        project: input.cwd ? (path.resolve(String(input.cwd)).toLowerCase() === path.resolve(os.homedir()).toLowerCase() ? 'Home folder' : path.basename(String(input.cwd)).slice(0, 80)) : prev.project || null,
         message: state === 'needs-you' && input.message ? String(input.message).slice(0, 120) : null,
         kind: state === 'needs-you' && input.notification_type ? String(input.notification_type).slice(0, 40) : null,
-        last: last || (state === 'working' && !input.tool_name ? '💬 Thinking about your message' : prev.last || null),
+        last: (last || (state === 'working' && !input.tool_name ? '💬 Thinking about your message'
+          : state === 'done' ? '✅ Finished' + (prev.last && !prev.last.startsWith('💬') && !prev.last.startsWith('✅') ? ' · ' + prev.last.replace(/^\S+\s/, '') : '')
+          : prev.last || null) || '').slice(0, 60) || null,
         since: prev.state === state && prev.since ? prev.since : now,
       };
     }
