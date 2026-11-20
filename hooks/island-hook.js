@@ -39,6 +39,7 @@ process.stdin.on('end', () => {
         t: now,
         project: input.cwd ? path.basename(String(input.cwd)).slice(0, 80) : null,
         message: state === 'needs-you' && input.message ? String(input.message).slice(0, 120) : null,
+        kind: state === 'needs-you' && input.notification_type ? String(input.notification_type).slice(0, 40) : null,
       };
     }
 

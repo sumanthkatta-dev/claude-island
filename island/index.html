@@ -231,20 +231,26 @@ function render() {
   if (open) setBars();
 }
 
+function isPermission(x) {
+  if (x.kind) return /permission|elicitation/i.test(x.kind);
+  return /permission|approve|allow/i.test(x.message || '');
+}
+
 function renderActivity() {
   const now = Date.now();
   const sessions = activity && activity.sessions ? Object.values(activity.sessions) : [];
-  const needs = sessions.filter(x => x.state === 'needs-you');
-  const done = sessions.filter(x => x.state === 'done' && now - x.t < 30 * 60e3);
-  const working = sessions.filter(x => x.state === 'working' && now - x.t < 20 * 60e3);
+  const fresh = sessions.filter(x => now - (x.t || 0) < 2 * 3600e3);
+  const asks = fresh.filter(x => x.state === 'needs-you' && isPermission(x));
+  const working = fresh.filter(x => x.state === 'working' && now - x.t < 20 * 60e3);
+  const latest = fresh.slice().sort((a, b) => b.t - a.t)[0];
   let st = 'idle', label = 'Idle', proj = null;
-  if (needs.length) { st = 'needs'; proj = needs[0].project; label = /permission/i.test(needs[0].message || '') ? 'Needs your permission' : 'Waiting for you'; }
+  if (asks.length) { st = 'needs'; proj = asks[0].project; label = 'Needs your permission'; }
   else if (working.length) { st = 'working'; proj = working[0].project; label = working.length > 1 ? `Working in ${working.length} sessions` : 'Working on its own'; }
-  else if (done.length) { st = 'needs'; proj = done[0].project; label = 'Done · your turn'; }
+  else if (latest && (latest.state === 'done' || latest.state === 'needs-you') && now - latest.t < 30 * 60e3) { st = 'needs'; proj = latest.project; label = 'Done · your turn'; }
   for (const id of ['act', 'act2']) { $(id).classList.toggle('working', st === 'working'); $(id).classList.toggle('needs', st === 'needs'); }
   $('dAct').textContent = label + (proj && !label.startsWith('Working in') ? ' · ' + proj : '');
   const key = st + label;
-  if (st === 'needs' && lastAct !== key && lastAct !== 'idle-init') popMsg(label === 'Done · your turn' ? 'Claude is done · your turn' : 'Claude needs you', 'var(--red)');
+  if (st === 'needs' && lastAct !== key && lastAct !== 'idle-init') popMsg(label === 'Done · your turn' ? 'Claude is done · your turn' : 'Claude needs your permission', 'var(--red)');
   lastAct = activity ? key : 'idle-init';
 }
 
