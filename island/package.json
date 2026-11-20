@@ -1,6 +1,6 @@
 {
   "name": "claude-island",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Dynamic-island-style pill showing your Claude usage limits",
   "main": "main.js",
   "scripts": {

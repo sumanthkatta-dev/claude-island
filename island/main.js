@@ -6,11 +6,17 @@ const path = require('path');
 const FILE = path.join(os.homedir(), '.claude', 'usage-island.json');
 const STATE_FILE = path.join(os.homedir(), '.claude', 'island-state.json');
 const W = 460;
-const H = 500;
+const H = 620;
 let win = null;
 let tray = null;
 
 if (!app.requestSingleInstanceLock()) app.quit();
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+
+const PREFS = () => path.join(app.getPath('userData'), 'prefs.json');
+let prefs = { soundPermission: true, soundDone: true };
+function loadPrefs() { try { prefs = { ...prefs, ...JSON.parse(fs.readFileSync(PREFS(), 'utf8')) }; } catch (_) {} }
+function savePrefs() { try { fs.writeFileSync(PREFS(), JSON.stringify(prefs)); } catch (_) {} if (win) win.webContents.send('prefs', prefs); }
 
 function place() {
   const { bounds } = screen.getPrimaryDisplay();
@@ -40,7 +46,7 @@ function createWindow() {
   win.setVisibleOnAllWorkspaces(true);
   win.setIgnoreMouseEvents(true, { forward: true });
   win.loadFile(path.join(__dirname, 'index.html'));
-  win.webContents.on('did-finish-load', () => { sendUsage(); sendActivity(); });
+  win.webContents.on('did-finish-load', () => { sendUsage(); sendActivity(); win.webContents.send('prefs', prefs); });
 }
 
 function sendUsage() {
@@ -79,6 +85,9 @@ function createTray() {
       click: (item) => app.setLoginItemSettings({ ...loginOpts, openAtLogin: item.checked }),
     },
     { type: 'separator' },
+    { label: 'Sound when Claude needs permission', type: 'checkbox', checked: prefs.soundPermission, click: (i) => { prefs.soundPermission = i.checked; savePrefs(); } },
+    { label: 'Sound when Claude finishes', type: 'checkbox', checked: prefs.soundDone, click: (i) => { prefs.soundDone = i.checked; savePrefs(); } },
+    { type: 'separator' },
     { label: 'Quit', click: () => app.quit() },
   ]));
   tray.on('click', toggleVisible);
@@ -89,6 +98,7 @@ ipcMain.on('mouse-over', (_e, over) => {
 });
 
 app.whenReady().then(() => {
+  loadPrefs();
   createWindow();
   createTray();
   globalShortcut.register('CommandOrControl+Alt+U', toggleVisible);

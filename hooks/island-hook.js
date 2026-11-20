@@ -31,6 +31,21 @@ process.stdin.on('end', () => {
     const id = String(input.session_id || 'default').slice(0, 100);
     const now = Date.now();
 
+    const prev = sessions[id] || {};
+    let last = null;
+    if (input.tool_name) {
+      const t = String(input.tool_name), ti = input.tool_input || {};
+      const file = ti.file_path || ti.notebook_path ? path.basename(String(ti.file_path || ti.notebook_path)) : null;
+      if (/^(Edit|MultiEdit|Write|NotebookEdit)$/.test(t)) last = '✏️ Edited ' + (file || 'a file');
+      else if (t === 'Read') last = '📖 Read ' + (file || 'a file');
+      else if (t === 'Bash') last = ti.description ? '▶️ ' + String(ti.description) : '▶️ Ran ' + String(ti.command || 'a command');
+      else if (/^(Grep|Glob)$/.test(t)) last = '🔍 Searched the code';
+      else if (/^Web/.test(t)) last = '🌐 Looked something up';
+      else if (/^(Task|Agent)$/.test(t)) last = '🤖 Ran a subagent';
+      else last = '⚙️ ' + t.replace(/^mcp__/, '').slice(0, 30);
+      last = last.slice(0, 60);
+    }
+
     if (state === 'end') {
       delete sessions[id];
     } else {
@@ -40,6 +55,8 @@ process.stdin.on('end', () => {
         project: input.cwd ? path.basename(String(input.cwd)).slice(0, 80) : null,
         message: state === 'needs-you' && input.message ? String(input.message).slice(0, 120) : null,
         kind: state === 'needs-you' && input.notification_type ? String(input.notification_type).slice(0, 40) : null,
+        last: last || (state === 'working' && !input.tool_name ? '💬 Thinking about your message' : prev.last || null),
+        since: prev.state === state && prev.since ? prev.since : now,
       };
     }
 

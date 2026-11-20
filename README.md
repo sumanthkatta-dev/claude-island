@@ -14,6 +14,8 @@ I use Claude Code a lot and kept hitting the 5-hour limit without warning. Claud
 
 ## Features
 
+- **Multiple sessions:** one dot per open Claude Code session, and the expanded panel lists each project with its state and last action ("✏️ Edited session.ts")
+- **Sounds:** a soft chime when Claude needs permission or finishes (toggle each from the tray)
 - **Activity light:** 🟢 pulsing green while Claude works on its own, 🔴 pulsing red when Claude needs you (permission, or done and waiting), ⚪ gray when idle
 - **Collapsed pill:** session %, reset time and weekly %. The session % turns amber at 80% and red at 95%
 - **Click to expand:** session, weekly and Fable bars with reset times
@@ -31,6 +33,8 @@ Claude Code ──(hooks)─────────────▶ island-hook.
 ```
 
 - **Usage numbers:** Claude Code passes the official `rate_limits` (5-hour and 7-day) to your status line on Pro and Max plans. The script saves them locally and prints your normal status line.
+- **Multiple sessions:** one dot per open Claude Code session, and the expanded panel lists each project with its state and last action ("✏️ Edited session.ts")
+- **Sounds:** a soft chime when Claude needs permission or finishes (toggle each from the tray)
 - **Activity light:** Claude Code [hooks](https://code.claude.com/docs/en/hooks) run a tiny script when you send a prompt or a tool finishes (working), when Claude needs input or permission (needs you), when it finishes (done), and when the session ends.
 - **The island** watches those two files and shows them.
 

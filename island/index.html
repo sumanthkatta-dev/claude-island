@@ -42,6 +42,12 @@
   .hist b.today { background:var(--clay); }
   .hist span { font-size:10px; color:#777; }
   .stale { color:var(--amber); }
+  .dots { display:flex; gap:4px; align-items:center; }
+  .srow { display:grid; grid-template-columns:12px minmax(0,1fr) auto; column-gap:8px; align-items:center; padding:5px 0; }
+  .srow .p { font-size:12.5px; color:#eee; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .srow .s { font-size:12px; color:#a9a9a9; white-space:nowrap; }
+  .srow .s.red { color:var(--red); } .srow .s.grn { color:var(--green); }
+  .srow .d { grid-column:2 / 4; font-size:11.5px; color:#8a8a8a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .hidden { display:none !important; }
 </style>
 </head>
@@ -49,13 +55,14 @@
 <div class="stage">
   <div class="isl" id="isl">
     <div class="mini" id="mini">
-      <span class="l"><span class="act" id="act"></span><span id="m5">Waiting for Claude Code</span></span>
+      <span class="l"><span class="dots" id="dots"><span class="act"></span></span><span id="m5">Waiting for Claude Code</span></span>
       <span class="mid" id="mReset"></span>
       <span id="mWk"></span>
     </div>
     <div class="pop" id="pop"><span class="dot" id="popDot"></span><span id="popText">Limit refreshed</span></div>
     <div class="det" id="det">
-      <div class="row"><span class="val" style="display:flex;align-items:center;gap:8px"><span class="act" id="act2"></span><span id="dAct" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px">Idle</span></span><span class="lbl" id="dSessionAge" style="white-space:nowrap"></span></div>
+      <div class="row"><span class="lbl">Claude sessions</span><span class="lbl" id="dSessionAge" style="white-space:nowrap"></span></div>
+      <div id="sessList" style="margin-top:4px"></div>
 
       <div class="sec">
         <div class="lbl">Current session (5-hour window)</div>
@@ -179,7 +186,7 @@ function render() {
   $('mWk').textContent = week ? 'wk ' + pct(week.pct) : '';
 
   if (five && five.resetsAt && !fiveExpired) {
-    $('dSessionAge').textContent = 'Running ' + dur(now - (five.resetsAt - FIVE_H));
+    $('dSessionAge').textContent = '5h window started ' + dur(now - (five.resetsAt - FIVE_H)) + ' ago';
     $('d5').textContent = pct(fivePct) + ' used';
     $('d5r').textContent = `Resets in ${dur(five.resetsAt - now)} · ${clock(five.resetsAt)}`;
   } else {
@@ -236,22 +243,60 @@ function isPermission(x) {
   return /permission|approve|allow/i.test(x.message || '');
 }
 
+let prefs = { soundPermission: true, soundDone: true }, audioCtx = null;
+function chime(kind) {
+  if (kind === 'permission' && !prefs.soundPermission) return;
+  if (kind === 'done' && !prefs.soundDone) return;
+  try {
+    audioCtx = audioCtx || new AudioContext();
+    const notes = kind === 'permission' ? [[880, 0], [1175, 0.16]] : [[784, 0]];
+    for (const [f, at] of notes) {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain(), t0 = audioCtx.currentTime + at;
+      o.type = 'sine'; o.frequency.value = f;
+      g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(0.07, t0 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.35);
+      o.connect(g).connect(audioCtx.destination); o.start(t0); o.stop(t0 + 0.4);
+    }
+  } catch (_) {}
+}
+
+function sessionView(x, now) {
+  if (x.state === 'needs-you' && isPermission(x)) return { st: 'needs', label: 'Needs permission', cls: 'red' };
+  if (x.state === 'working' && now - x.t < 20 * 60e3) return { st: 'working', label: 'Working', cls: 'grn' };
+  if ((x.state === 'done' || x.state === 'needs-you') && now - x.t < 30 * 60e3) return { st: 'needs', label: 'Your turn', cls: 'red' };
+  return { st: 'idle', label: 'Idle', cls: '' };
+}
+
+const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+let lastStates = {};
+
 function renderActivity() {
   const now = Date.now();
-  const sessions = activity && activity.sessions ? Object.values(activity.sessions) : [];
-  const fresh = sessions.filter(x => now - (x.t || 0) < 2 * 3600e3);
-  const asks = fresh.filter(x => x.state === 'needs-you' && isPermission(x));
-  const working = fresh.filter(x => x.state === 'working' && now - x.t < 20 * 60e3);
-  const latest = fresh.slice().sort((a, b) => b.t - a.t)[0];
-  let st = 'idle', label = 'Idle', proj = null;
-  if (asks.length) { st = 'needs'; proj = asks[0].project; label = 'Needs your permission'; }
-  else if (working.length) { st = 'working'; proj = working[0].project; label = working.length > 1 ? `Working in ${working.length} sessions` : 'Working on its own'; }
-  else if (latest && (latest.state === 'done' || latest.state === 'needs-you') && now - latest.t < 30 * 60e3) { st = 'needs'; proj = latest.project; label = 'Done · your turn'; }
-  for (const id of ['act', 'act2']) { $(id).classList.toggle('working', st === 'working'); $(id).classList.toggle('needs', st === 'needs'); }
-  $('dAct').textContent = label + (proj && !label.startsWith('Working in') ? ' · ' + proj : '');
-  const key = st + label;
-  if (st === 'needs' && lastAct !== key && lastAct !== 'idle-init') popMsg(label === 'Done · your turn' ? 'Claude is done · your turn' : 'Claude needs your permission', 'var(--red)');
-  lastAct = activity ? key : 'idle-init';
+  const all = activity && activity.sessions ? Object.entries(activity.sessions) : [];
+  const fresh = all.filter(([, x]) => now - (x.t || 0) < 2 * 3600e3).sort((a, b) => b[1].t - a[1].t).slice(0, 4);
+  const views = fresh.map(([id, x]) => ({ id, x, v: sessionView(x, now) }));
+
+  // collapsed dots: one per session (or a single gray dot)
+  const dots = views.length ? views.map(({ v }) => `<span class="act ${v.st === 'working' ? 'working' : v.st === 'needs' ? 'needs' : ''}"></span>`).join('') : '<span class="act"></span>';
+  if ($('dots').innerHTML !== dots) $('dots').innerHTML = dots;
+
+  // expanded list
+  const list = views.length ? views.map(({ x, v }) => `<div class="srow"><span class="act ${v.st === 'working' ? 'working' : v.st === 'needs' ? 'needs' : ''}"></span><span class="p">${esc(x.project || 'Claude Code')}</span><span class="s ${v.cls}">${v.label}</span>${x.last ? `<span class="d">${esc(x.last)}</span>` : ''}</div>`).join('')
+    : '<div class="lbl" style="padding:4px 0">No active sessions</div>';
+  if ($('sessList').innerHTML !== list) { $('sessList').innerHTML = list; if (open) isl.style.height = det.offsetHeight + 'px'; }
+
+  // pop-ups + sounds on transitions to red
+  if (activity) {
+    for (const { id, x, v } of views) {
+      const key = v.label + ':' + x.t;
+      const was = lastStates[id];
+      if (lastAct !== 'idle-init' && v.st === 'needs' && (!was || !was.startsWith(v.label))) {
+        if (v.label === 'Needs permission') { popMsg(`${x.project || 'Claude'} needs your permission`, 'var(--red)'); chime('permission'); }
+        else if (now - x.t < 60e3) { popMsg(`${x.project || 'Claude'} is done · your turn`, 'var(--red)'); chime('done'); }
+      }
+      lastStates[id] = key;
+    }
+    lastAct = 'ready';
+  }
 }
 
 function setBars() {
@@ -287,6 +332,7 @@ isl.addEventListener('mouseleave', () => {
   collapseTimer = setTimeout(() => open && setOpen(false), 6000);
 });
 
+if (window.island && window.island.onPrefs) window.island.onPrefs((p) => { prefs = { ...prefs, ...p }; });
 if (window.island && window.island.onActivity) window.island.onActivity((d) => { activity = d; renderActivity(); });
 if (window.island) window.island.onUsage((d) => { data = d; render(); if (open) isl.style.height = det.offsetHeight + 'px'; });
 setInterval(() => { render(); renderActivity(); }, 1000);
