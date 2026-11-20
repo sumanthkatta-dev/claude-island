@@ -52,6 +52,7 @@ settings.statusLine = { type: 'command', command: `node "${fwd(statusDest)}"` };
 
 // Hooks: remove old island entries, then add fresh ones
 const events = {
+  PreToolUse: 'needs-you',
   UserPromptSubmit: 'working',
   PostToolUse: 'working',
   Notification: 'needs-you',
@@ -66,6 +67,7 @@ for (const [event, state] of Object.entries(events)) {
     .filter((g) => g.hooks.length > 0);
   const entry = { hooks: [{ type: 'command', command: `node "${fwd(hookDest)}" ${state}`, timeout: 5 }] };
   if (event === 'PostToolUse') entry.matcher = '*';
+  if (event === 'PreToolUse') entry.matcher = 'AskUserQuestion';
   cleaned.push(entry);
   settings.hooks[event] = cleaned;
 }

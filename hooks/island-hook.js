@@ -33,7 +33,9 @@ process.stdin.on('end', () => {
 
     const prev = sessions[id] || {};
     let last = null;
-    if (input.tool_name) {
+    if (input.tool_name && state === 'needs-you') {
+      last = '❓ Asked you a question';
+    } else if (input.tool_name) {
       const t = String(input.tool_name), ti = input.tool_input || {};
       const file = ti.file_path || ti.notebook_path ? path.basename(String(ti.file_path || ti.notebook_path)) : null;
       if (/^(Edit|MultiEdit|Write|NotebookEdit)$/.test(t)) last = '✏️ Edited ' + (file || 'a file');
@@ -54,7 +56,7 @@ process.stdin.on('end', () => {
         t: now,
         project: input.cwd ? (path.resolve(String(input.cwd)).toLowerCase() === path.resolve(os.homedir()).toLowerCase() ? 'Home folder' : path.basename(String(input.cwd)).slice(0, 80)) : prev.project || null,
         message: state === 'needs-you' && input.message ? String(input.message).slice(0, 120) : null,
-        kind: state === 'needs-you' && input.notification_type ? String(input.notification_type).slice(0, 40) : null,
+        kind: state === 'needs-you' ? (input.tool_name === 'AskUserQuestion' ? 'question' : input.notification_type ? String(input.notification_type).slice(0, 40) : null) : null,
         last: (last || (state === 'working' && !input.tool_name ? '💬 Thinking about your message'
           : state === 'done' ? '✅ Finished' + (prev.last && !prev.last.startsWith('💬') && !prev.last.startsWith('✅') ? ' · ' + prev.last.replace(/^\S+\s/, '') : '')
           : prev.last || null) || '').slice(0, 60) || null,

@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; media-src blob:">
 <style>
   :root { --ease: cubic-bezier(.32,.72,0,1); --clay:#D97757; --sand:#E8B98A; --green:#5DCAA5; --amber:#F2C14E; --red:#E24B4A; --fable:#E8B98A; }
   * { box-sizing: border-box; }
@@ -241,36 +241,55 @@ function render() {
 }
 
 function isPermission(x) {
-  if (x.kind) return /permission|elicitation/i.test(x.kind);
+  if (x.kind) return /permission|elicitation|question/i.test(x.kind);
   return /permission|approve|allow/i.test(x.message || '');
 }
 
 let prefs = { soundPermission: true, soundDone: false }, audioCtx = null;
+function wavTone(notes) {
+  const rate = 22050, len = Math.ceil(rate * (Math.max(...notes.map(n => n[1])) + 0.45));
+  const data = new Int16Array(len);
+  for (const [f, at] of notes) {
+    const start = Math.floor(at * rate);
+    for (let i = 0; i < rate * 0.4 && start + i < len; i++) {
+      const t = i / rate, env = Math.min(1, t / 0.02) * Math.exp(-t * 9);
+      data[start + i] = Math.max(-32767, Math.min(32767, data[start + i] + Math.sin(2 * Math.PI * f * t) * env * 9000));
+    }
+  }
+  const buf = new ArrayBuffer(44 + len * 2), v = new DataView(buf);
+  const w = (o, str) => { for (let i = 0; i < str.length; i++) v.setUint8(o + i, str.charCodeAt(i)); };
+  w(0, 'RIFF'); v.setUint32(4, 36 + len * 2, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, len * 2, true);
+  new Int16Array(buf, 44).set(data);
+  return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+}
+const SOUNDS = {};
 function chime(kind) {
   if (kind === 'permission' && !prefs.soundPermission) return;
   if (kind === 'done' && !prefs.soundDone) return;
+  const notes = kind === 'permission' ? [[880, 0], [1175, 0.16]] : kind === 'test' ? [[880, 0], [1175, 0.16], [784, 0.4]] : [[784, 0]];
   try {
-    audioCtx = audioCtx || new AudioContext();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    const notes = kind === 'permission' ? [[880, 0], [1175, 0.16]] : kind === 'test' ? [[880, 0], [1175, 0.16], [784, 0.4]] : [[784, 0]];
-    for (const [f, at] of notes) {
-      const o = audioCtx.createOscillator(), g = audioCtx.createGain(), t0 = audioCtx.currentTime + at;
-      o.type = 'sine'; o.frequency.value = f;
-      g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(0.28, t0 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.35);
-      o.connect(g).connect(audioCtx.destination); o.start(t0); o.stop(t0 + 0.4);
-    }
-  } catch (_) {}
+    SOUNDS[kind] = SOUNDS[kind] || wavTone(notes);
+    const a = new Audio(SOUNDS[kind]); a.volume = 1;
+    a.play().then(() => console.log('[island] sound played:', kind)).catch((e) => {
+      console.warn('[island] audio blocked, using system beep:', e && e.message);
+      window.island && window.island.beep && window.island.beep();
+    });
+  } catch (e) {
+    console.warn('[island] sound failed, using system beep:', e && e.message);
+    window.island && window.island.beep && window.island.beep();
+  }
 }
 
 function sessionView(x, now) {
-  if (x.state === 'needs-you' && isPermission(x)) return { st: 'needs', label: 'Needs permission', cls: 'red' };
+  if (x.state === 'needs-you' && isPermission(x)) return { st: 'needs', label: x.kind === 'question' ? 'Has a question' : 'Needs your help', cls: 'red' };
   if (x.state === 'working' && now - x.t < 20 * 60e3) return { st: 'working', label: 'Working', cls: 'grn' };
   if ((x.state === 'done' || x.state === 'needs-you') && now - x.t < 30 * 60e3) return { st: 'ready', label: 'Ready', cls: 'wht' };
   return { st: 'idle', label: 'Idle', cls: '' };
 }
 
 const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-let lastStates = {};
+let lastStates = {}, lastDotsHtml = '', lastListHtml = '';
 
 function renderActivity() {
   const now = Date.now();
@@ -280,12 +299,12 @@ function renderActivity() {
 
   // collapsed dots: one per session (or a single gray dot)
   const dots = views.length ? views.map(({ v }) => `<span class="act ${v.st === 'idle' ? '' : v.st}"></span>`).join('') : '<span class="act"></span>';
-  if ($('dots').innerHTML !== dots) $('dots').innerHTML = dots;
+  if (lastDotsHtml !== dots) { $('dots').innerHTML = dots; lastDotsHtml = dots; }
 
   // expanded list
   const list = views.length ? views.map(({ x, v }) => `<div class="srow"><span class="act ${v.st === 'idle' ? '' : v.st}"></span><span class="p">${esc(x.project || 'Claude Code')}</span><span class="s ${v.cls}">${v.label}</span>${x.last ? `<span class="d">${esc(x.last)}</span>` : ''}</div>`).join('')
     : '<div class="lbl" style="padding:4px 0">No active sessions</div>';
-  if ($('sessList').innerHTML !== list) { $('sessList').innerHTML = list; if (open) isl.style.height = det.offsetHeight + 'px'; }
+  if (lastListHtml !== list) { $('sessList').innerHTML = list; lastListHtml = list; if (open) isl.style.height = det.offsetHeight + 'px'; }
 
   // pop-ups + sounds on transitions to red
   if (activity) {
@@ -293,7 +312,7 @@ function renderActivity() {
       const key = v.label + ':' + x.t;
       const was = lastStates[id];
       if (lastAct !== 'idle-init' && v.st === 'needs' && (!was || !was.startsWith(v.label))) {
-        popMsg(`${x.project || 'Claude'} needs your permission`, 'var(--red)'); chime('permission');
+        popMsg(`${x.project || 'Claude'} needs your help`, 'var(--red)'); chime('permission');
       }
       if (lastAct !== 'idle-init' && v.st === 'ready' && was && !was.startsWith('Ready') && now - x.t < 60e3) {
         popMsg(`${x.project || 'Claude'} finished`, '#f2f2f2'); chime('done');

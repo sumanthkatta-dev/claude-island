@@ -1,4 +1,4 @@
-const { app, BrowserWindow, screen, ipcMain, Tray, Menu, nativeImage, globalShortcut } = require('electron');
+const { app, BrowserWindow, screen, ipcMain, Tray, Menu, nativeImage, globalShortcut, shell } = require('electron');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -94,11 +94,14 @@ function createTray() {
     { label: 'Sound when Claude needs permission', type: 'checkbox', checked: prefs.soundPermission, click: (i) => { prefs.soundPermission = i.checked; savePrefs(); } },
     { label: 'Sound when Claude finishes', type: 'checkbox', checked: prefs.soundDone, click: (i) => { prefs.soundDone = i.checked; savePrefs(); } },
     { label: 'Play test sound', click: () => win && win.webContents.send('test-sound') },
+    { label: 'Open debug console', click: () => win && win.webContents.openDevTools({ mode: 'detach' }) },
     { type: 'separator' },
     { label: 'Quit', click: () => app.quit() },
   ]));
   tray.on('click', toggleVisible);
 }
+
+ipcMain.on('beep', () => shell.beep());
 
 ipcMain.on('mouse-over', (_e, over) => {
   if (win) win.setIgnoreMouseEvents(!over, { forward: true });
