@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
 <style>
-  :root { --ease: cubic-bezier(.32,.72,0,1); --green:#5DCAA5; --amber:#EF9F27; --red:#E24B4A; --fable:#7F77DD; }
+  :root { --ease: cubic-bezier(.32,.72,0,1); --clay:#D97757; --sand:#E8B98A; --green:#5DCAA5; --amber:#F2C14E; --red:#E24B4A; --fable:#E8B98A; }
   * { box-sizing: border-box; }
   html, body { margin:0; background:transparent; overflow:hidden; font-family:"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif; -webkit-font-smoothing:antialiased; user-select:none; }
   .stage { display:flex; justify-content:center; padding-top:2px; }
@@ -18,7 +18,7 @@
   .isl.open .mini { opacity:0; filter:blur(4px); pointer-events:none; }
   .mini .l { display:flex; align-items:center; gap:8px; }
   .mini .mid { color:#a9a9a9; }
-  .dot { width:8px; height:8px; border-radius:50%; background:var(--sev, var(--green)); flex:none; }
+  .dot { width:8px; height:8px; border-radius:50%; background:var(--clay); flex:none; }
   .act { width:9px; height:9px; border-radius:50%; background:#5a5a5a; flex:none; transition:background .3s; }
   .act.working { background:var(--green); box-shadow:0 0 6px var(--green); animation:pulse 1.4s ease-in-out infinite; }
   .act.needs { background:var(--red); box-shadow:0 0 6px var(--red); animation:pulse .9s ease-in-out infinite; }
@@ -39,7 +39,7 @@
   .hist { display:flex; align-items:flex-end; gap:6px; height:30px; margin-top:6px; }
   .hist div { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; }
   .hist b { display:block; width:100%; border-radius:2px; background:#3a3a3a; min-height:2px; }
-  .hist b.today { background:var(--green); }
+  .hist b.today { background:var(--clay); }
   .hist span { font-size:10px; color:#777; }
   .stale { color:var(--amber); }
   .hidden { display:none !important; }
@@ -65,7 +65,7 @@
 
       <div class="sec" id="weekSec">
         <div class="lbl">This week · all models</div>
-        <div class="bar"><i id="bWk" style="background:var(--green)"></i></div>
+        <div class="bar"><i id="bWk" style="background:var(--clay)"></i></div>
         <div class="row lbl"><span id="dWk">-</span><span id="dWkr">-</span></div>
         <div class="lbl" id="dPace" style="margin-top:4px"></div>
       </div>
@@ -98,8 +98,8 @@ const FIVE_H = 5 * 3600e3, WEEK = 7 * 24 * 3600e3, STALE = 10 * 60e3;
 let data = null, activity = null, lastAct = 'idle-init', open = false, lastSev = 0, lastFiveReset = null, lastFivePct = null, collapseTimer = null, popTimer = null;
 
 const sevOf = (p) => p == null ? 0 : p >= 95 ? 3 : p >= 80 ? 2 : p >= 50 ? 1 : 0;
-const sevColor = (s) => s >= 3 ? 'var(--red)' : s >= 2 ? 'var(--amber)' : 'var(--green)';
-const barColor = (p) => p >= 95 ? 'var(--red)' : p >= 80 ? 'var(--amber)' : 'var(--green)';
+const sevColor = (s) => s >= 3 ? 'var(--red)' : s >= 2 ? 'var(--amber)' : 'var(--clay)';
+const barColor = (p) => p >= 95 ? 'var(--red)' : p >= 80 ? 'var(--amber)' : 'var(--clay)';
 const pct = (p) => p == null ? '-' : Math.round(p) + '%';
 const clock = (ms) => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 const dayClock = (ms) => new Date(ms).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' });
@@ -140,7 +140,7 @@ function history() {
 
 function popMsg(text, color) {
   $('popText').textContent = text;
-  $('popDot').style.background = color || 'var(--green)';
+  $('popDot').style.background = color || 'var(--clay)';
   isl.classList.add('popping');
   clearTimeout(popTimer);
   popTimer = setTimeout(() => isl.classList.remove('popping'), 3500);
