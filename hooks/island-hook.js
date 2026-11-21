@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Claude Island activity hook
+// Usage Island activity hook
 // Called by Claude Code hooks: node island-hook.js <working|needs-you|done|end>
 // Saves Claude's current state to ~/.claude/island-state.json for the island's light.
 // Safety: never prints anything, never blocks Claude, always exits 0.

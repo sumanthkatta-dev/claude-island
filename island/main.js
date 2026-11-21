@@ -78,11 +78,11 @@ function toggleVisible() {
 
 function createTray() {
   tray = new Tray(nativeImage.createFromPath(path.join(__dirname, 'icon.png')));
-  tray.setToolTip('Claude Island v' + VERSION);
+  tray.setToolTip('Usage Island v' + VERSION);
   const loginOpts = { path: process.execPath, args: [app.getAppPath()] };
   const startup = app.getLoginItemSettings(loginOpts).openAtLogin;
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: 'Claude Island v' + VERSION, enabled: false },
+    { label: 'Usage Island v' + VERSION, enabled: false },
     { type: 'separator' },
     { label: 'Show / hide   (Ctrl+Alt+U)', click: toggleVisible },
     { label: 'Restart', click: () => { app.relaunch(); app.exit(0); } },

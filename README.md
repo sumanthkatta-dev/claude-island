@@ -1,10 +1,12 @@
-# Claude Island
+<p align="center"><img src="docs/logo.png" width="120" alt="Usage Island logo"></p>
 
-A Dynamic-Island-style pill for Windows that shows your Claude usage limits at the top center of your screen, right under the camera.
+# Usage Island
+
+A Dynamic-Island-style pill for Windows that shows your Claude Code usage limits and what your sessions are doing at the top center of your screen, right under the camera.
 
 > **Unofficial side project. Not affiliated with, endorsed by, or made by Anthropic.**
 
-![Claude Island concept demo](docs/demo.gif)
+![Usage Island concept demo](docs/demo.gif)
 
 *Animated concept demo*
 
@@ -42,7 +44,7 @@ Claude Code ──(hooks)─────────────▶ island-hook.
 
 - **No network:** nothing in this project makes a network request, and nothing leaves your machine.
 - **No commands:** the app and scripts never launch programs.
-- **Writes only:** `~/.claude/usage-island.json`, `~/.claude/island-state.json`, and copies of the scripts in `~/.claude/claude-island/`.
+- **Writes only:** `~/.claude/usage-island.json`, `~/.claude/island-state.json`, and copies of the scripts in `~/.claude/usage-island/`.
 - **Never blocks Claude:** the hook prints nothing, always exits 0, and stops itself after 2 seconds. It takes about 0.05–0.1 s per run.
 - **Locked-down window:** context isolation is on, Node is off in the page, and a strict CSP means it only loads its own files.
 - **Reversible:** `setup.js` backs up your `settings.json` and only adds its own entries. Your other settings and hooks are untouched. `uninstall.js` removes exactly what was added and restores your previous status line.
@@ -51,7 +53,7 @@ Claude Code ──(hooks)─────────────▶ island-hook.
 
 Requires [Node.js](https://nodejs.org) LTS.
 
-1. Download this repo (Code → Download ZIP) and unzip it somewhere permanent, like `C:\Users\<you>\claude-island`
+1. Download this repo (Code → Download ZIP) and unzip it somewhere permanent, like `C:\Users\<you>\usage-island`
 2. Open a terminal in that folder and run:
    ```
    node setup.js
@@ -78,6 +80,10 @@ Quit the island from the tray icon, then run `node uninstall.js` in the folder a
 - Built and tested on a virtual display. Windows testing is in progress, so please open an issue if something breaks.
 - It's an Electron app, so it uses about 100 MB of RAM. A lighter Tauri version may come later.
 - With several Claude Code sessions open, red wins: if any session needs you, the light is red.
+
+## Name
+
+This project was called *Claude Island* before v1.5. It was renamed so it doesn't look like an official Anthropic product. "Claude" and "Claude Code" are trademarks of Anthropic and are used here only to describe what this tool works with. Upgrading from an older version: run `node setup.js` again and it moves everything over.
 
 ## License
 

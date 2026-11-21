@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Claude Island status line
+// Usage Island status line
 // 1) Reads the JSON Claude Code pipes in on stdin
 // 2) Saves usage to ~/.claude/usage-island.json for the desktop island
 // 3) Prints the same compact line you already have: ctx · 5h · 7d · cost

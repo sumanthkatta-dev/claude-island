@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Claude Island uninstall: run with `node uninstall.js`
+// Usage Island uninstall: run with `node uninstall.js`
 // Removes only what setup.js added and puts your old status line back.
 // Quit the island from its tray icon first.
 
@@ -8,7 +8,8 @@ const os = require('os');
 const path = require('path');
 
 const CLAUDE = path.join(os.homedir(), '.claude');
-const DEST = path.join(CLAUDE, 'claude-island');
+const DEST = path.join(CLAUDE, 'usage-island');
+const OLD_DEST = path.join(CLAUDE, 'claude-island'); // folder name used before v1.5
 const SETTINGS = path.join(CLAUDE, 'settings.json');
 
 if (fs.existsSync(SETTINGS)) {
@@ -20,7 +21,8 @@ if (fs.existsSync(SETTINGS)) {
   fs.copyFileSync(SETTINGS, backup);
 
   if (settings.statusLine && String(settings.statusLine.command || '').includes('island-statusline.js')) {
-    const prevFile = path.join(DEST, 'previous-statusline.json');
+    let prevFile = path.join(DEST, 'previous-statusline.json');
+    if (!fs.existsSync(prevFile)) prevFile = path.join(OLD_DEST, 'previous-statusline.json');
     if (fs.existsSync(prevFile)) {
       try { settings.statusLine = JSON.parse(fs.readFileSync(prevFile, 'utf8')); } catch (_) { delete settings.statusLine; }
     } else delete settings.statusLine;
@@ -46,6 +48,6 @@ if (fs.existsSync(SETTINGS)) {
 for (const f of ['usage-island.json', 'island-state.json']) {
   try { fs.unlinkSync(path.join(CLAUDE, f)); } catch (_) {}
 }
-try { fs.rmSync(DEST, { recursive: true, force: true }); } catch (_) {}
+for (const d of [DEST, OLD_DEST]) { try { fs.rmSync(d, { recursive: true, force: true }); } catch (_) {} }
 
-console.log('  Claude Island files removed. You can now delete this folder.\n');
+console.log('  Usage Island files removed. You can now delete this folder.\n');

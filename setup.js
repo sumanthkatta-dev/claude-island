@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Claude Island setup: run with `node setup.js` from this folder.
-// 1. Copies the two small scripts into ~/.claude/claude-island/
+// Usage Island setup: run with `node setup.js` from this folder.
+// 1. Copies the two small scripts into ~/.claude/usage-island/
 // 2. Backs up ~/.claude/settings.json
 // 3. Adds the island status line and activity hooks (your other settings and hooks are left alone)
 
@@ -9,7 +9,8 @@ const os = require('os');
 const path = require('path');
 
 const CLAUDE = path.join(os.homedir(), '.claude');
-const DEST = path.join(CLAUDE, 'claude-island');
+const DEST = path.join(CLAUDE, 'usage-island');
+const OLD_DEST = path.join(CLAUDE, 'claude-island'); // folder name used before v1.5
 const SETTINGS = path.join(CLAUDE, 'settings.json');
 const fwd = (p) => p.replace(/\\/g, '/');
 
@@ -29,7 +30,7 @@ if (fs.existsSync(SETTINGS)) {
 fs.mkdirSync(DEST, { recursive: true });
 const statusSrc = path.join(__dirname, 'statusline', 'island-statusline.js');
 const hookSrc = path.join(__dirname, 'hooks', 'island-hook.js');
-if (!fs.existsSync(statusSrc) || !fs.existsSync(hookSrc)) fail('Run this from the claude-island folder.');
+if (!fs.existsSync(statusSrc) || !fs.existsSync(hookSrc)) fail('Run this from the Usage Island folder.');
 const statusDest = path.join(DEST, 'island-statusline.js');
 const hookDest = path.join(DEST, 'island-hook.js');
 fs.copyFileSync(statusSrc, statusDest);
@@ -45,6 +46,9 @@ if (hadSettings) {
 // Remember a status line that isn't ours, so uninstall can put it back
 const isOurs = (cmd) => typeof cmd === 'string' && cmd.includes('island-statusline.js');
 const prevFile = path.join(DEST, 'previous-statusline.json');
+// Migrate from the pre-1.5 folder: keep the saved original status line, then remove the old copy
+const oldPrev = path.join(OLD_DEST, 'previous-statusline.json');
+if (fs.existsSync(oldPrev) && !fs.existsSync(prevFile)) fs.copyFileSync(oldPrev, prevFile);
 if (settings.statusLine && !isOurs(settings.statusLine.command)) {
   fs.writeFileSync(prevFile, JSON.stringify(settings.statusLine, null, 2));
 }
@@ -72,13 +76,17 @@ for (const [event, state] of Object.entries(events)) {
   settings.hooks[event] = cleaned;
 }
 
+// Old folder is no longer used once settings point at the new one
+const finishMigration = () => { try { if (fs.existsSync(OLD_DEST)) fs.rmSync(OLD_DEST, { recursive: true, force: true }); } catch (_) {} };
+
 // Write atomically
 fs.mkdirSync(CLAUDE, { recursive: true });
 const tmp = SETTINGS + '.tmp';
 fs.writeFileSync(tmp, JSON.stringify(settings, null, 2));
 fs.renameSync(tmp, SETTINGS);
+finishMigration();
 
-console.log('\n  Claude Island is set up.');
+console.log('\n  Usage Island is set up.');
 console.log('  Scripts:  ' + DEST);
 if (backup) console.log('  Backup:   ' + backup);
 console.log('\n  Next:');
