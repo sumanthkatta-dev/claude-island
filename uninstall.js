@@ -50,4 +50,12 @@ for (const f of ['usage-island.json', 'island-state.json']) {
 }
 for (const d of [DEST, OLD_DEST]) { try { fs.rmSync(d, { recursive: true, force: true }); } catch (_) {} }
 
+// Shortcuts made by make-shortcuts.bat
+const shortcutDirs = [
+  path.join(process.env.APPDATA || '', 'Microsoft', 'Windows', 'Start Menu', 'Programs'),
+  path.join(os.homedir(), 'Desktop'),
+  path.join(os.homedir(), 'OneDrive', 'Desktop'),
+];
+for (const d of shortcutDirs) { try { fs.unlinkSync(path.join(d, 'Usage Island.lnk')); } catch (_) {} }
+
 console.log('  Usage Island files removed. You can now delete this folder.\n');

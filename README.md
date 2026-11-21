@@ -67,6 +67,9 @@ Requires [Node.js](https://nodejs.org) LTS.
 
 **Shortcut:** open the Code tab in the Claude desktop app and ask Claude to set this up by following this README.
 
+### Shortcuts
+Double-click `make-shortcuts.bat` once to add **Usage Island** to your Start menu and Desktop, with its icon. Or right-click the tray pill and tick **Start with Windows** so it opens by itself.
+
 ### Using it
 - **Click** the pill to expand. It collapses on its own 6 seconds after your mouse leaves
 - **Ctrl + Alt + U** shows or hides it
