@@ -245,39 +245,66 @@ function isPermission(x) {
   return /permission|approve|allow/i.test(x.message || '');
 }
 
-let prefs = { soundPermission: true, soundDone: false }, audioCtx = null;
-function wavTone(notes) {
-  const rate = 22050, len = Math.ceil(rate * (Math.max(...notes.map(n => n[1])) + 0.45));
-  const data = new Int16Array(len);
-  for (const [f, at] of notes) {
-    const start = Math.floor(at * rate);
-    for (let i = 0; i < rate * 0.4 && start + i < len; i++) {
-      const t = i / rate, env = Math.min(1, t / 0.02) * Math.exp(-t * 9);
-      data[start + i] = Math.max(-32767, Math.min(32767, data[start + i] + Math.sin(2 * Math.PI * f * t) * env * 9000));
+let prefs = { soundPermission: true, soundDone: false, soundUi: true }, audioCtx = null;
+// Sound design: each sound is a list of tones { f: start Hz, to: end Hz (optional sweep), at: start s, dur: s, gain, bell: adds overtones }
+const SOUND_SPECS = {
+  // Needs you: bright three-note bell arpeggio, ~1.5 s
+  permission: [
+    { f: 1046.5, at: 0.00, dur: 1.2, gain: 0.9, bell: true },
+    { f: 1318.5, at: 0.14, dur: 1.2, gain: 0.8, bell: true },
+    { f: 1568.0, at: 0.28, dur: 1.2, gain: 0.8, bell: true },
+  ],
+  // Finished: calm two-note falling chime, ~1.5 s
+  done: [
+    { f: 784.0, at: 0.00, dur: 1.3, gain: 0.8, bell: true },
+    { f: 523.3, at: 0.22, dur: 1.3, gain: 0.8, bell: true },
+  ],
+  // Open: quick rising pop. Close: soft falling drop.
+  open: [{ f: 520, to: 980, at: 0, dur: 0.16, gain: 0.55 }],
+  close: [{ f: 900, to: 480, at: 0, dur: 0.16, gain: 0.45 }],
+};
+SOUND_SPECS.test = SOUND_SPECS.permission;
+
+function synth(spec) {
+  const rate = 44100, total = Math.max(...spec.map(t => t.at + t.dur)) + 0.05, len = Math.ceil(rate * total);
+  const mix = new Float32Array(len);
+  for (const t of spec) {
+    const start = Math.floor(t.at * rate), n = Math.floor(t.dur * rate);
+    let phase = 0;
+    for (let i = 0; i < n && start + i < len; i++) {
+      const x = i / n, tt = i / rate;
+      const f = t.to ? t.f + (t.to - t.f) * x : t.f;
+      phase += 2 * Math.PI * f / rate;
+      const attack = Math.min(1, tt / 0.008);
+      const env = t.bell ? attack * Math.exp(-tt * 3.2) : attack * Math.sin(Math.PI * Math.min(1, x * 1.15)) * (1 - x);
+      let v = Math.sin(phase);
+      if (t.bell) v += 0.35 * Math.sin(2 * phase) * Math.exp(-tt * 5) + 0.12 * Math.sin(3 * phase) * Math.exp(-tt * 8);
+      mix[start + i] += v * env * t.gain;
     }
   }
-  const buf = new ArrayBuffer(44 + len * 2), v = new DataView(buf);
-  const w = (o, str) => { for (let i = 0; i < str.length; i++) v.setUint8(o + i, str.charCodeAt(i)); };
-  w(0, 'RIFF'); v.setUint32(4, 36 + len * 2, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
-  v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, len * 2, true);
-  new Int16Array(buf, 44).set(data);
+  let peak = 0; for (const v of mix) peak = Math.max(peak, Math.abs(v));
+  const scale = peak ? 0.85 / peak : 1;
+  const buf = new ArrayBuffer(44 + len * 2), dv = new DataView(buf);
+  const w = (o, str) => { for (let i = 0; i < str.length; i++) dv.setUint8(o + i, str.charCodeAt(i)); };
+  w(0, 'RIFF'); dv.setUint32(4, 36 + len * 2, true); w(8, 'WAVEfmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+  dv.setUint32(24, rate, true); dv.setUint32(28, rate * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true); w(36, 'data'); dv.setUint32(40, len * 2, true);
+  for (let i = 0; i < len; i++) dv.setInt16(44 + i * 2, Math.round(Math.max(-1, Math.min(1, mix[i] * scale)) * 32767), true);
   return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
 }
 const SOUNDS = {};
 function chime(kind) {
   if (kind === 'permission' && !prefs.soundPermission) return;
   if (kind === 'done' && !prefs.soundDone) return;
-  const notes = kind === 'permission' ? [[880, 0], [1175, 0.16]] : kind === 'test' ? [[880, 0], [1175, 0.16], [784, 0.4]] : [[784, 0]];
+  if ((kind === 'open' || kind === 'close') && !prefs.soundUi) return;
   try {
-    SOUNDS[kind] = SOUNDS[kind] || wavTone(notes);
-    const a = new Audio(SOUNDS[kind]); a.volume = 1;
+    SOUNDS[kind] = SOUNDS[kind] || synth(SOUND_SPECS[kind]);
+    const a = new Audio(SOUNDS[kind]); a.volume = kind === 'open' || kind === 'close' ? 0.6 : 1;
     a.play().then(() => console.log('[island] sound played:', kind)).catch((e) => {
       console.warn('[island] audio blocked, using system beep:', e && e.message);
-      window.island && window.island.beep && window.island.beep();
+      if (kind !== 'open' && kind !== 'close') window.island && window.island.beep && window.island.beep();
     });
   } catch (e) {
-    console.warn('[island] sound failed, using system beep:', e && e.message);
-    window.island && window.island.beep && window.island.beep();
+    console.warn('[island] sound failed:', e && e.message);
   }
 }
 
@@ -335,6 +362,7 @@ function setBars() {
 }
 
 function setOpen(o) {
+  if (o !== open) chime(o ? 'open' : 'close');
   open = o;
   isl.classList.toggle('open', o);
   if (o) {

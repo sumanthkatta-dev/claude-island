@@ -1,7 +1,7 @@
 {
   "name": "usage-island",
   "productName": "Usage Island",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Dynamic-island-style pill showing your Claude Code usage limits. Unofficial, not affiliated with Anthropic.",
   "main": "main.js",
   "scripts": {

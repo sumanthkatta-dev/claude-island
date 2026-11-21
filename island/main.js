@@ -17,7 +17,7 @@ const VERSION = require('./package.json').version;
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
 const PREFS = () => path.join(app.getPath('userData'), 'prefs.json');
-let prefs = { soundPermission: true, soundDone: false };
+let prefs = { soundPermission: true, soundDone: false, soundUi: true };
 function loadPrefs() { try { prefs = { ...prefs, ...JSON.parse(fs.readFileSync(PREFS(), 'utf8')) }; } catch (_) {} }
 function savePrefs() { try { fs.writeFileSync(PREFS(), JSON.stringify(prefs)); } catch (_) {} if (win) win.webContents.send('prefs', prefs); }
 
@@ -93,6 +93,7 @@ function createTray() {
     { type: 'separator' },
     { label: 'Sound when Claude needs permission', type: 'checkbox', checked: prefs.soundPermission, click: (i) => { prefs.soundPermission = i.checked; savePrefs(); } },
     { label: 'Sound when Claude finishes', type: 'checkbox', checked: prefs.soundDone, click: (i) => { prefs.soundDone = i.checked; savePrefs(); } },
+    { label: 'Sound when opening / closing', type: 'checkbox', checked: prefs.soundUi, click: (i) => { prefs.soundUi = i.checked; savePrefs(); } },
     { label: 'Play test sound', click: () => win && win.webContents.send('test-sound') },
     { label: 'Open debug console', click: () => win && win.webContents.openDevTools({ mode: 'detach' }) },
     { type: 'separator' },
