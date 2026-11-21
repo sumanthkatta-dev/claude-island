@@ -25,9 +25,15 @@
   .act.working { background:var(--green); box-shadow:0 0 6px var(--green); animation:pulse 1.4s ease-in-out infinite; }
   .act.needs { background:var(--red); box-shadow:0 0 8px var(--red); animation:pulse .7s ease-in-out infinite; }
   @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.35 } }
-  .pop { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; gap:8px; font-size:13px; opacity:0; transform:scale(.9); transition:opacity .25s, transform .35s var(--ease); pointer-events:none; }
-  .isl.popping .pop { opacity:1; transform:scale(1); }
-  .isl.popping .mini { opacity:0; }
+  .pop { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; gap:8px; font-size:13px; white-space:nowrap; padding:0 16px; opacity:0; transform:scale(.92); transition:opacity .2s, transform .35s var(--ease); pointer-events:none; }
+  .mini { transition:opacity .14s, filter .2s !important; }
+  .isl.popping .pop, .isl.sticky .pop { opacity:1; transform:scale(1); transition-delay:.14s; }
+  .isl.popping .mini, .isl.sticky .mini { opacity:0; transition-delay:0s; }
+  .isl.sticky:not(.popping):hover .pop { opacity:0; transition-delay:0s; }
+  .isl.sticky:not(.popping):hover .mini { opacity:1; transition-delay:.12s; }
+  .isl.open .pop { opacity:0 !important; }
+  .isl.sticky { animation:ring 1.3s ease-in-out infinite; }
+  @keyframes ring { 0%,100% { box-shadow:0 0 0 2px var(--red), 0 0 10px rgba(226,75,74,.4); } 50% { box-shadow:0 0 0 3px var(--red), 0 0 24px rgba(226,75,74,.7); } }
   .det { position:absolute; top:0; left:50%; width:380px; padding:16px 0 14px; opacity:0; filter:blur(6px);
     transform:translateX(-50%) scale(.92); transition:opacity .25s, filter .25s, transform .45s var(--ease); }
   .isl.open .det { opacity:1; filter:blur(0); transform:translateX(-50%) scale(1); transition-delay:.12s; }
@@ -147,12 +153,34 @@ function history() {
   return out;
 }
 
-function popMsg(text, color) {
+let stickyText = null, stickySince = 0, lastRing = 0, rings = 0;
+const fitW = (text) => Math.round(Math.min(410, Math.max(250, 64 + text.length * 7.3)));
+function showPopText(text, color) {
   $('popText').textContent = text;
   $('popDot').style.background = color || 'var(--clay)';
+  if (!open) isl.style.width = fitW(text) + 'px';
+}
+function popMsg(text, color, ms = 3500) {
+  showPopText(text, color);
   isl.classList.add('popping');
   clearTimeout(popTimer);
-  popTimer = setTimeout(() => isl.classList.remove('popping'), 3500);
+  popTimer = setTimeout(() => {
+    isl.classList.remove('popping');
+    if (stickyText) showPopText(stickyText, 'var(--red)');
+    else if (!open) isl.style.width = '';
+  }, ms);
+}
+function setSticky(text) {
+  if (stickyText === text) return;
+  stickyText = text;
+  isl.classList.add('sticky');
+  if (!isl.classList.contains('popping')) showPopText(text, 'var(--red)');
+}
+function clearSticky() {
+  if (!stickyText) return;
+  stickyText = null; stickySince = 0; rings = 0;
+  isl.classList.remove('sticky');
+  if (!isl.classList.contains('popping') && !open) isl.style.width = '';
 }
 
 function render() {
@@ -345,13 +373,21 @@ function renderActivity() {
       const key = v.label + ':' + x.t;
       const was = lastStates[id];
       if (lastAct !== 'idle-init' && v.st === 'needs' && (!was || !was.startsWith(v.label))) {
-        popMsg(`${sessionName(x)} needs your help`, 'var(--red)'); chime('permission');
+        chime('permission'); lastRing = now; rings = 1;
       }
       if (lastAct !== 'idle-init' && v.st === 'ready' && was && !was.startsWith('Ready') && now - x.t < 60e3) {
-        popMsg(`${sessionName(x)} finished`, '#f2f2f2'); chime('done');
+        popMsg(`Ready for your input · ${sessionName(x)}`, '#f2f2f2', 3000); chime('done');
       }
       lastStates[id] = key;
     }
+    // sticky "needs you" message: stays until every stuck session is handled
+    const stuck = views.filter(({ v }) => v.st === 'needs');
+    if (stuck.length) {
+      const { x } = stuck[0];
+      setSticky(stuck.length > 1 ? `${stuck.length} sessions need you` : `${sessionName(x)} ${x.kind === 'question' ? 'has a question' : 'needs your permission'}`);
+      if (!stickySince) stickySince = now;
+      if (lastRing && now - lastRing > 120e3 && rings < 3) { chime('permission'); lastRing = now; rings++; }
+    } else clearSticky();
     lastAct = 'ready';
   }
 }
@@ -377,7 +413,7 @@ function setOpen(o) {
     isl.style.borderRadius = '32px';
     setBars();
   } else {
-    isl.style.width = ''; isl.style.height = ''; isl.style.borderRadius = '';
+    isl.style.width = stickyText ? fitW(stickyText) + 'px' : ''; isl.style.height = ''; isl.style.borderRadius = '';
     ['b5', 'bWk', 'bFa'].forEach(id => $(id).style.width = '0');
   }
 }
