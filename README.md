@@ -6,9 +6,9 @@ A Dynamic-Island-style pill for Windows that shows your Claude Code usage limits
 
 > **Unofficial side project. Not affiliated with, endorsed by, or made by Anthropic.**
 
-![Usage Island concept demo](docs/demo.gif)
+![Usage Island: green means working, red means it needs you, white means ready](docs/demo.gif)
 
-*Animated concept demo*
+▶️ **[Watch the 50-second explainer](docs/explainer.mp4)**
 
 ## Why
 
