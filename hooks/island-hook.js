@@ -61,6 +61,7 @@ process.stdin.on('end', () => {
           : state === 'done' ? '✅ Finished' + (prev.last && !prev.last.startsWith('💬') && !prev.last.startsWith('✅') ? ' · ' + prev.last.replace(/^\S+\s/, '') : '')
           : prev.last || null) || '').slice(0, 60) || null,
         since: prev.state === state && prev.since ? prev.since : now,
+        topic: input.prompt ? String(input.prompt).replace(/\s+/g, ' ').trim().slice(0, 40) : prev.topic || null,
       };
     }
 
